@@ -1,0 +1,46 @@
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# --- Virtualenvs (all names) ---
+venv/
+.venv/
+venv3*/
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+
+# --- Frontend build output ---
+frontend/dist/
+*.tsbuildinfo
+
+# --- Databases / local data ---
+*.db
+*.sqlite3
+*.sqlite
+
+# --- Logs ---
+*.log
+
+# --- Playwright E2E artifacts ---
+frontend/test-results/
+frontend/playwright-report/
+
+# --- OS junk ---
+Thumbs.db
+.DS_Store
+Desktop.ini

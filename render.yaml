@@ -1,0 +1,71 @@
+# Render Blueprint (render.yaml)
+#
+# Deploys the full stack: backend (Docker web service), frontend (static
+# site), managed Postgres, and managed Redis (Key Value). Render reads
+# this file automatically when you connect the repo as a "Blueprint".
+#
+# NOTE: Render's Blueprint schema does evolve over time — if a field here
+# is rejected at deploy time, cross-check against Render's current docs
+# (https://render.com/docs/blueprint-spec) rather than assuming this file
+# is stale everywhere; most of this schema has been stable for a long time.
+
+databases:
+  - name: rpm-postgres
+    plan: free
+    databaseName: rpm_db
+    user: rpm_user
+
+services:
+  - type: redis
+    name: rpm-redis
+    plan: free
+    ipAllowList: []   # only accessible from other Render services in this account
+
+  - type: web
+    name: rpm-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rpm-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: rpm-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true   # Render generates and stores a strong random secret
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: ENVIRONMENT
+        value: production
+      - key: BACKEND_CORS_ORIGINS
+        # Update to the actual deployed frontend URL after first deploy —
+        # Render assigns the *.onrender.com URL only once the service exists.
+        value: '["https://rpm-frontend.onrender.com"]'
+
+  - type: web
+    name: rpm-frontend
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    rootDir: frontend
+    envVars:
+      - key: VITE_API_BASE_URL
+        # Update to the actual deployed backend URL after first deploy.
+        value: https://rpm-backend.onrender.com/api/v1
+    routes:
+      # SPA fallback — same reasoning as nginx.conf's try_files, needed here
+      # because Render's static site host has no nginx.conf equivalent to edit.
+      - type: rewrite
+        source: /*
+        destination: /index.html

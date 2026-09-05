@@ -1,0 +1,114 @@
+[
+  {
+    "disease": "stroke",
+    "path": "/home/claude/rpm-project/backend/app/ai_engine/models/stroke_model.joblib",
+    "data_source": "synthetic-epidemiologically-informed-n30000",
+    "accuracy": 0.6927,
+    "precision": 0.097,
+    "recall": 0.717,
+    "roc_auc": 0.7636,
+    "brier_score": 0.1917,
+    "train_size": 24000,
+    "test_size": 6000,
+    "positive_rate_train": 0.0441,
+    "threshold_metrics": {
+      "at_moderate_plus_0.25": {
+        "precision": 0.0642,
+        "recall": 0.9094
+      },
+      "at_high_plus_0.5": {
+        "precision": 0.097,
+        "recall": 0.717
+      }
+    },
+    "model_selected": "logistic_regression",
+    "model_comparison_cv_roc_auc": {
+      "logistic_regression": 0.7977,
+      "random_forest": 0.7827,
+      "gradient_boosting": 0.7901
+    },
+    "feature_importances": {
+      "age": 0.3765,
+      "gender_male": 0.0464,
+      "hypertension_flag": 0.0858,
+      "heart_disease_flag": 0.0948,
+      "avg_glucose_level": 0.155,
+      "bmi": 0.0898,
+      "systolic_bp": 0.1345,
+      "heart_rate": 0.0171
+    }
+  },
+  {
+    "disease": "diabetes",
+    "path": "/home/claude/rpm-project/backend/app/ai_engine/models/diabetes_model.joblib",
+    "data_source": "real-pima-n724+bootstrap-augmented-n2172",
+    "accuracy": 0.781,
+    "precision": 0.6488,
+    "recall": 0.7889,
+    "roc_auc": 0.8842,
+    "brier_score": 0.1389,
+    "train_size": 2316,
+    "test_size": 580,
+    "positive_rate_train": 0.3441,
+    "threshold_metrics": {
+      "at_moderate_plus_0.25": {
+        "precision": 0.5533,
+        "recall": 0.9648
+      },
+      "at_high_plus_0.5": {
+        "precision": 0.6488,
+        "recall": 0.7889
+      }
+    },
+    "model_selected": "gradient_boosting",
+    "model_comparison_cv_roc_auc": {
+      "logistic_regression": 0.8284,
+      "random_forest": 0.8853,
+      "gradient_boosting": 0.8903
+    },
+    "feature_importances": {
+      "age": 0.2127,
+      "bmi": 0.207,
+      "glucose": 0.4967,
+      "diastolic_bp": 0.0837
+    }
+  },
+  {
+    "disease": "hypertension",
+    "path": "/home/claude/rpm-project/backend/app/ai_engine/models/hypertension_model.joblib",
+    "data_source": "synthetic-epidemiologically-informed-n30000",
+    "accuracy": 0.7635,
+    "precision": 0.1245,
+    "recall": 0.7791,
+    "roc_auc": 0.8524,
+    "brier_score": 0.1592,
+    "train_size": 24000,
+    "test_size": 6000,
+    "positive_rate_train": 0.0415,
+    "threshold_metrics": {
+      "at_moderate_plus_0.25": {
+        "precision": 0.0741,
+        "recall": 0.9478
+      },
+      "at_high_plus_0.5": {
+        "precision": 0.1245,
+        "recall": 0.7791
+      }
+    },
+    "model_selected": "logistic_regression",
+    "model_comparison_cv_roc_auc": {
+      "logistic_regression": 0.8449,
+      "random_forest": 0.8339,
+      "gradient_boosting": 0.8347
+    },
+    "feature_importances": {
+      "age": 0.1426,
+      "bmi": 0.0977,
+      "gender_male": 0.0312,
+      "systolic_bp": 0.3611,
+      "diastolic_bp": 0.2517,
+      "heart_rate": 0.0451,
+      "glucose": 0.0707
+    }
+  }
+]

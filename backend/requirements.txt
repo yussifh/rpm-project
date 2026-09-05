@@ -1,0 +1,55 @@
+# --- Web Framework ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# --- Database ---
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# --- Caching ---
+redis==5.0.8
+
+# --- Auth & Security ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+# ^ pinned deliberately: passlib 1.7.4's version-detection code reads
+# bcrypt.__about__, which bcrypt>=4.1 removed — installing "latest bcrypt"
+# (the default if left unpinned) breaks password hashing at import time.
+# 4.0.1 is the last version passlib 1.7.4 detects correctly.
+python-multipart==0.0.9
+
+# --- Validation / Settings ---
+pydantic==2.9.2
+pydantic-settings==2.5.2
+email-validator==2.2.0
+# ^ required for Pydantic's EmailStr type (used throughout app/schemas/).
+# Pydantic does NOT bundle this — without it, any schema using EmailStr
+# raises an ImportError the first time it's used, not at pip-install time.
+
+# --- AI / ML ---
+# Pinned to the exact versions used to produce the checked-in model
+# artifacts (app/ai_engine/models/*.joblib). joblib-pickled sklearn
+# Pipeline objects are NOT guaranteed compatible across scikit-learn (or
+# numpy) major/minor versions — installing an older sklearn than what
+# trained these artifacts risks a silent behavior change or an outright
+# load failure. If you retrain (`python -m app.ai_engine.train`) with a
+# different scikit-learn version, re-pin this to match afterward.
+scikit-learn==1.8.0
+pandas==3.0.2
+numpy==2.4.4
+joblib==1.5.3
+
+# --- AI Health Assistant (LLM client) ---
+anthropic==0.39.0
+
+# --- Testing ---
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx==0.27.2
+fakeredis==2.24.1
+
+# --- Utilities ---
+python-dotenv==1.0.1
+reportlab==4.2.5

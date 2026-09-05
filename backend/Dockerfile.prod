@@ -1,0 +1,62 @@
+# ------------------------------------------------------------------
+# Production image — multi-stage build.
+#
+# Stage 1 compiles/installs Python packages (needs build-essential,
+# libpq-dev for psycopg2, gcc for scikit-learn/numpy C extensions).
+# Stage 2 copies ONLY the installed packages + app code into a clean
+# slim image — build tools never ship in the final image, keeping it
+# smaller and reducing attack surface.
+# ------------------------------------------------------------------
+
+# --- Stage 1: builder ---
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# --- Stage 2: runtime ---
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH=/home/appuser/.local/bin:$PATH
+
+# libpq5 (runtime-only, no -dev/-devel headers) is needed for psycopg2 at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash appuser
+
+WORKDIR /app
+
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Runs migrations, then starts Uvicorn with multiple worker processes.
+# (Deliberately NOT gunicorn+UvicornWorker here — that pairing has had
+# real cross-version compatibility churn, and I can't verify current
+# compatibility without network access in this environment. Uvicorn's
+# own --workers flag is officially supported and has no such risk.)
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "4"]

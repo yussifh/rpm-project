@@ -1,0 +1,152 @@
+erDiagram
+    USERS ||--o| PATIENT_PROFILES : "has"
+    USERS ||--o| ADMIN_PROFILES : "has"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ AUDIT_LOGS : "performs (nullable)"
+
+    PATIENT_PROFILES ||--o{ VITAL_READINGS : "logs"
+    PATIENT_PROFILES ||--o{ RISK_PREDICTIONS : "has"
+    PATIENT_PROFILES ||--o{ ALERTS : "triggers"
+    PATIENT_PROFILES ||--o{ MEDICATIONS : "takes"
+    PATIENT_PROFILES ||--o{ MEDICAL_HISTORY_ENTRIES : "has"
+    PATIENT_PROFILES ||--o{ DISEASE_ASSESSMENTS : "self-reports"
+
+    VITAL_READINGS ||--o{ RISK_PREDICTIONS : "feeds"
+    VITAL_READINGS ||--o{ ALERTS : "may trigger"
+    RISK_PREDICTIONS ||--o{ ALERTS : "may trigger"
+
+    MEDICATIONS ||--o{ MEDICATION_LOGS : "tracked by"
+
+    USERS {
+        uuid id PK
+        string email UK
+        string hashed_password
+        string full_name
+        string phone_number
+        enum role
+        bool is_active
+        bool is_verified
+        datetime created_at
+        datetime updated_at
+    }
+
+    ADMIN_PROFILES {
+        uuid id PK
+        uuid user_id FK
+        string department
+        string job_title
+        bool is_super_admin
+        jsonb permissions
+    }
+
+    PATIENT_PROFILES {
+        uuid id PK
+        uuid user_id FK
+        date date_of_birth
+        enum gender
+        string blood_group
+        float height_cm
+        float weight_kg
+        enum primary_condition
+        string emergency_contact_name
+        string emergency_contact_phone
+        text chronic_conditions_summary
+    }
+
+    VITAL_READINGS {
+        uuid id PK
+        uuid patient_id FK
+        datetime recorded_at
+        enum source
+        int blood_pressure_systolic
+        int blood_pressure_diastolic
+        int heart_rate_bpm
+        float blood_glucose_mg_dl
+        float spo2_percent
+        float temperature_celsius
+        int respiratory_rate
+        text notes
+    }
+
+    RISK_PREDICTIONS {
+        uuid id PK
+        uuid patient_id FK
+        uuid source_vital_id FK
+        enum disease_type
+        float risk_score
+        enum risk_level
+        string model_version
+        string data_source
+        jsonb input_features
+        datetime predicted_at
+    }
+
+    DISEASE_ASSESSMENTS {
+        uuid id PK
+        uuid patient_id FK
+        enum disease_type
+        jsonb symptoms
+        datetime created_at
+    }
+
+    ALERTS {
+        uuid id PK
+        uuid patient_id FK
+        uuid related_vital_id FK
+        uuid related_prediction_id FK
+        string title
+        text message
+        enum severity
+        enum status
+        datetime acknowledged_at
+        datetime resolved_at
+    }
+
+    MEDICATIONS {
+        uuid id PK
+        uuid patient_id FK
+        string name
+        string dosage
+        string frequency
+        text instructions
+        date start_date
+        date end_date
+        bool is_active
+    }
+
+    MEDICATION_LOGS {
+        uuid id PK
+        uuid medication_id FK
+        datetime scheduled_at
+        enum status
+        datetime taken_at
+    }
+
+    MEDICAL_HISTORY_ENTRIES {
+        uuid id PK
+        uuid patient_id FK
+        string condition_name
+        date diagnosed_date
+        text notes
+        string recorded_by
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        string title
+        text message
+        string notification_type
+        bool is_read
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid user_id FK
+        string action
+        string entity_type
+        string entity_id
+        string ip_address
+        jsonb extra_metadata
+        datetime created_at
+    }

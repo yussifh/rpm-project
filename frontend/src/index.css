@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-sunken text-ink font-sans antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  /* Visible keyboard focus everywhere — not decorative, a11y floor */
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-teal-500;
+  }
+}
+
+@layer utilities {
+  /* Signature touch: vitals/timestamps/IDs render as a monitor-style
+     tabular readout — monospace + tabular-nums keeps digits from
+     jittering in width as they update. */
+  .readout {
+    @apply font-mono tabular-nums;
+  }
+}
