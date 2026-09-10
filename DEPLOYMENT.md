@@ -47,26 +47,30 @@ Put a reverse proxy (Caddy, Traefik, or Nginx on the host) in front of ports 80/
 ## 3. Render (Managed Platform)
 
 `render.yaml` at the repo root is a Render **Blueprint** — connect the repo in the Render dashboard as a Blueprint and it provisions:
-- `rpm-postgres` — managed Postgres
-- `rpm-redis` — managed Redis (Key Value)
-- `rpm-backend` — Docker web service built from `backend/Dockerfile.prod`
-- `rpm-frontend` — static site built from `frontend/` via `npm run build`
+
+| Service | Type | What it does |
+|---------|------|--------------|
+| `rpm-postgres` | Managed PostgreSQL | Persistent database (free tier, 90-day expiry) |
+| `rpm-redis` | Managed Key Value | Redis cache for vitals + JWT blacklist |
+| `rpm-backend` | Web (Docker) | FastAPI API via `backend/Dockerfile.prod` — entrypoint runs Alembic migrations, then seeds demo data via `render_seed.py` |
+| `rpm-frontend` | Web (static) | React PWA built via `npm run build`, served over CDN with SPA rewrite rules |
 
 Steps:
-1. Push this repo to GitHub.
-2. In Render: **New > Blueprint**, connect the repo. Render reads `render.yaml` and provisions everything.
-3. After the first deploy, Render assigns real `*.onrender.com` URLs to `rpm-backend` and `rpm-frontend`. Go back into `render.yaml` (or just edit the env vars directly in the Render dashboard for a quicker fix) and update:
-   - `rpm-backend`'s `BACKEND_CORS_ORIGINS` → the real frontend URL
-   - `rpm-frontend`'s `VITE_API_BASE_URL` → the real backend URL + `/api/v1`
+1. Push this repo to GitHub (see below if no remote is configured).
+2. In Render: **New > Blueprint**, connect the repo. Render reads `render.yaml` and provisions all four services (~5 minutes).
+3. After the first deploy, Render assigns real `*.onrender.com` URLs to `rpm-backend` and `rpm-frontend`. Edit the env vars **directly in the Render dashboard** (faster than editing render.yaml):
+   - `rpm-backend` → `BACKEND_CORS_ORIGINS` → set to `["https://<your-real-frontend-url>.onrender.com"]`
+   - `rpm-frontend` → `VITE_API_BASE_URL` → set to `https://<your-real-backend-url>.onrender.com/api/v1`
 4. Redeploy both services so the URL updates take effect (frontend needs a rebuild since Vite inlines env vars at build time, not runtime).
-5. Open a **Shell** on the `rpm-backend` service in the Render dashboard and run:
+5. Set your Anthropic API key (optional, for AI Health Assistant):
+   - `rpm-backend` → `ANTHROPIC_API_KEY` → paste your key → redeploy
+6. Train the AI models — open a **Shell** on the `rpm-backend` service in the Render dashboard and run:
    ```bash
-   python -m scripts.seed_admin --email admin@example.com --full-name "System Admin"
    python -m app.ai_engine.train
    ```
-   Migrations already ran automatically (same `entrypoint.sh` as the Docker Compose path).
+   The demo data (admin account, patient, vitals history) is seeded automatically on every deploy by `render_seed.py`.
 
-**CI-gated deploys (optional, alternative to Render's own auto-deploy-on-push):** `.github/workflows/ci.yml` has a `deploy` job that only runs after both test jobs pass on `main`, and calls Render's per-service **Deploy Hook** URLs. To use this instead of (or in addition to) Render's native auto-deploy:
+**CI-gated deploys (optional):** `.github/workflows/ci.yml` has a `deploy` job that only runs after both test jobs pass on `main`, and calls Render's per-service **Deploy Hook** URLs. To use this instead of (or in addition to) Render's native auto-deploy:
 1. In Render, open each service's Settings → Deploy Hook, copy the URL.
 2. In GitHub, add repo secrets `RENDER_BACKEND_DEPLOY_HOOK` and `RENDER_FRONTEND_DEPLOY_HOOK` with those URLs.
 3. If you want CI to be the *only* trigger (not also Render's native auto-deploy racing it), disable auto-deploy in each Render service's settings.

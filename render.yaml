@@ -1,26 +1,64 @@
-# Render Blueprint — one-click setup for the RPM PWA.
-# Deploy: sign in to render.com, "New +" > "Blueprint", pick this repository.
+# Render Blueprint — provisions the full RPM PWA stack.
+# Deploy: render.com → New + → Blueprint → connect this repository.
+#
+# Services provisioned:
+#   rpm-postgres  — managed PostgreSQL (free tier, 90-day expiry)
+#   rpm-redis     — managed Key Value store (free tier)
+#   rpm-backend   — FastAPI API (Docker, multi-stage prod image)
+#   rpm-frontend  — React PWA (static site, CDN-served)
+#
+# After first deploy, update the two placeholder URLs:
+#   1. rpm-backend  → BACKEND_CORS_ORIGINS  (real frontend URL)
+#   2. rpm-frontend → VITE_API_BASE_URL    (real backend URL + /api/v1)
+# Then redeploy both services.
+
 services:
-  # --- Backend API (FastAPI + SQLite) ---
+  # --- Managed PostgreSQL ---
+  - type: postgres
+    name: rpm-postgres
+    plan: free
+    databaseName: rpm_db
+    user: rpm_user
+    ipAllowList: ""
+
+  # --- Managed Redis (Key Value) ---
+  - type: redis
+    name: rpm-redis
+    plan: free
+    ipAllowList: ""
+
+  # --- Backend API (FastAPI + Docker) ---
   - type: web
     name: rpm-backend
-    runtime: python
+    runtime: docker
     rootDir: backend
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash -c "python scripts/render_seed.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        value: sqlite:////opt/render/project/src/backend/rpm_prod.db
+        fromDatabase:
+          name: rpm-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: rpm-redis
+          property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
       - key: BACKEND_CORS_ORIGINS
-        value: '["https://rpm-frontend.onrender.com","http://localhost:4173","http://127.0.0.1:4173","http://localhost:5173","http://127.0.0.1:5173"]'
+        value: '["https://rpm-frontend.onrender.com"]'
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
-  # --- Frontend PWA (built dist served over HTTPS) ---
+  # --- Frontend PWA (static site) ---
   - type: web
     name: rpm-frontend
     runtime: static
