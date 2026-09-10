@@ -16,31 +16,49 @@ IMPORTANT — data source disclosure (per disease):
   Institute of Diabetes and Digestive and Kidney Diseases). This is real
   patient data, not synthetic — see app/ai_engine/data/pima_diabetes.csv
   and app/ai_engine/real_data.py. Its features (age, bmi, glucose,
-  diastolic_bp) were chosen to match exactly what that dataset provides,
-  which is why this list differs slightly from the other two diseases.
-- STROKE and HYPERTENSION: still trained on SYNTHETICALLY GENERATED data
-  (see data_synthesis.py). Real public datasets exist (e.g. the Kaggle
-  "Stroke Prediction Dataset") but record risk factors as binary flags
-  (hypertension: yes/no, heart_disease: yes/no) rather than the continuous
-  vitals (systolic_bp, heart_rate) this RPM system actually collects and
-  needs for day-to-day monitoring, so a direct swap isn't possible without
-  either redesigning what the app collects or losing signal. The synthetic
-  generators for these two are informed by published prevalence rates
-  (e.g. ~4.9% stroke rate, ~9% hypertension comorbidity, ~5% heart disease
-  comorbidity in the Kaggle stroke cohort) rather than arbitrary numbers,
-  but they are still simulated, not real patient outcomes.
+  diastolic_bp, diabetes_pedigree) map one-to-one to that dataset's
+  columns (skin_thickness and insulin are intentionally excluded — the
+  app's vitals form doesn't capture them), which is why this list differs
+  slightly from the other two diseases.
+- STROKE and HYPERTENSION: previously SYNTHETIC (see data_synthesis.py for
+  the retired generators). Both have been RETRAINED on the REAL, public
+  Framingham Heart Study dataset (4,240 real patients) — the landmark
+  cardiovascular cohort that first established the modern concept of
+  cardiovascular risk factors. Local copy at
+  app/ai_engine/data/framingham.csv, loaders in real_data.py
+  (load_real_framingham_stroke_dataset / _hypertension_dataset). These
+  loaders map Framingham's continuous vitals (sysBP, diaBP, BMI, heartRate,
+  glucose) onto this app's exact feature lists, so every STROKE_FEATURES /
+  HYPERTENSION_FEATURES column is now backed by real measured values rather
+  than simulated ones. Two honest caveats about target framing:
+    * HYPERTENSION target = Framingham's `prevalentHyp` (patient was
+      hypertensive / on BP meds). Since the model takes blood pressure as an
+      input, some circularity is inherent to this app's design — the value of
+      the swap is that the decision boundary and its relationship to age,
+      BMI, glucose and heart-rate are now learned from 4,240 real patients.
+    * STROKE target = Framingham's `TenYearCHD` (10-year atherosclerotic CVD
+      risk), the dataset's published hard outcome, because its literal
+      `prevalentStroke` column has only 25 positives (0.6%) — too sparse to
+      train on. Stroke and CHD share the same atherosclerotic risk-factor
+      pathway and the same Framingham risk-score foundation, so this is the
+      closest defensible real framing for this app's "stroke risk" model.
+- The retired synthetic generators remain in data_synthesis.py and the old
+  synthetic model artifacts are preserved under
+  app/ai_engine/models/backup_synthetic/ for reproducibility/audit.
 
-None of these three models are clinically validated. Before any real-world
-clinical use, the stroke and hypertension models must be retrained on a
-proper labeled clinical dataset (e.g. a licensed EHR extract) and ALL
-THREE models — including the diabetes model despite using real data —
-must be reviewed/validated by a qualified clinician and biostatistician,
-since 768 records from one population (Pima Indian women, Arizona, 1988-ish
-NIDDK study) does not generalize to a general patient population either.
-This is a student/portfolio project — treat the shipped models as a
-working demonstration of the ARCHITECTURE and of good MLOps practice
-(real data where available, documented provenance, calibration), not as
-medical-grade predictors ready for patient-facing clinical decisions.
+None of these three models are clinically validated. Though all three now
+train on real patient data, each has population-specific limitations that
+prevent direct clinical generalization: the diabetes model comes from 768
+Pima Indian women (Arizona, ~1988 NIDDK study); the stroke/hypertension
+models come from the Framingham cohort (mostly white, middle-class
+Massachusetts residents, mid-20th century). Before any real-world clinical
+use, these models must be reviewed/validated by a qualified clinician and
+biostatistician, and ideally retrained on a dataset representative of the
+target patient population. This is a student/portfolio project — treat the
+shipped models as a working demonstration of the ARCHITECTURE and of good
+MLOps practice (real data where available, documented provenance,
+calibration), not as medical-grade predictors ready for patient-facing
+clinical decisions.
 """
 
 # Order matters — must match the column order used at training time.
@@ -72,6 +90,7 @@ DIABETES_FEATURES = [
     "bmi",
     "glucose",
     "diastolic_bp",
+    "diabetes_pedigree",
 ]
 
 HYPERTENSION_FEATURES = [
@@ -116,13 +135,17 @@ FEATURE_SETS: dict[str, list[str]] = {
 # ORM/pydantic layer here (keeping this module framework-agnostic, per
 # the module docstring above).
 CONDITION_VITAL_FIELDS: dict[str, list[str]] = {
-    DIABETES: ["blood_glucose_mg_dl", "blood_pressure_diastolic"],
+    DIABETES: [
+        "blood_glucose_mg_dl",
+        "blood_pressure_diastolic",
+        "diabetes_pedigree_function",
+    ],
     HYPERTENSION: ["blood_pressure_systolic", "blood_pressure_diastolic", "heart_rate_bpm", "blood_glucose_mg_dl"],
     STROKE: ["blood_glucose_mg_dl", "blood_pressure_systolic", "heart_rate_bpm"],
 }
 
-# Overall pipeline/architecture version. Per-model data provenance is
-# recorded separately in each artifact's "data_source" field (see train.py)
-# since diabetes now trains on real data while stroke/hypertension remain
-# synthetic — a single flat version string can't honestly describe both.
-MODEL_VERSION = "v2.0.0-mixed-provenance"
+# Overall pipeline/architecture version. All three models now train on REAL
+# patient data (diabetes -> Pima; stroke/hypertension -> Framingham), with
+# dataset-specific framing caveats documented in the module docstring and in
+# each artifact's "data_source" field (see train.py).
+MODEL_VERSION = "v2.3.0-real-provenance"

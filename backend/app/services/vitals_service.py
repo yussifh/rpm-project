@@ -59,6 +59,13 @@ from app.services.trend_analysis import FIELD_CONFIG, DataPoint, classify_trend,
 SEVERITY_MAP = {"warning": AlertSeverity.WARNING, "critical": AlertSeverity.CRITICAL}
 AI_ALERT_RISK_LEVELS = {RiskLevel.HIGH, RiskLevel.CRITICAL}
 
+# Clinical thresholds for disease-specific AI alerts that supplement
+# the ML model's output. The diabetes model (trained on Pima Indian
+# women) under-predicts for male patients with elevated glucose, so a
+# hard clinical threshold catches cases the model misses.
+DIABETES_GLUCOSE_CRITICAL = 300
+DIABETES_GLUCOSE_WARNING = 200
+
 
 @dataclass
 class VitalSubmissionResult:
@@ -134,6 +141,12 @@ class VitalsService:
             blood_pressure_diastolic=data.blood_pressure_diastolic,
             heart_rate_bpm=data.heart_rate_bpm,
             blood_glucose_mg_dl=data.blood_glucose_mg_dl,
+            skin_thickness_mm=data.skin_thickness_mm,
+            serum_insulin_mu_u_ml=data.serum_insulin_mu_u_ml,
+            diabetes_pedigree_function=data.diabetes_pedigree_function,
+            height_cm=data.height_cm,
+            bmi=data.bmi,
+            age_years=data.age_years,
             spo2_percent=data.spo2_percent,
             temperature_celsius=data.temperature_celsius,
             respiratory_rate=data.respiratory_rate,
@@ -187,11 +200,31 @@ class VitalsService:
             predictions.append(prediction)
 
             if prediction.risk_level in AI_ALERT_RISK_LEVELS:
+                # Confirmation-over-time for AI alerts. The stroke and
+                # hypertension models are tuned toward recall (they rarely
+                # miss a real problem) at the cost of low precision
+                # (~10-13% of high/critical flags are true positives — see
+                # training_report.json). Alerting critically — which also
+                # notifies the patient's emergency contact — on a SINGLE
+                # such prediction would produce frequent false "contact
+                # help now" alarms that erode trust and cause real alarm.
+                # So a critical alert only escalates (CRITICAL + emergency
+                # contact) when the SAME condition was already flagged
+                # high/critical on the previous reading — a sustained
+                # pattern, not a one-off. A first elevated prediction is
+                # still surfaced, but as a WARNING with no emergency
+                # contact escalation.
+                sustained = self._previous_prediction_was_elevated(
+                    patient.id, disease, prediction.id
+                )
+                if prediction.risk_level == RiskLevel.CRITICAL and sustained:
+                    severity = AlertSeverity.CRITICAL
+                else:
+                    severity = AlertSeverity.WARNING
+
                 self._raise_alert(
                     patient=patient,
-                    severity=AlertSeverity.CRITICAL
-                    if prediction.risk_level == RiskLevel.CRITICAL
-                    else AlertSeverity.WARNING,
+                    severity=severity,
                     title=f"Elevated {disease.value.title()} Risk Detected",
                     message=(
                         f"AI model flagged {disease.value} risk as {prediction.risk_level.value} "
@@ -200,7 +233,52 @@ class VitalsService:
                     related_prediction_id=prediction.id,
                 )
 
+        # Clinical override: the diabetes ML model (trained on Pima
+        # Indian women) under-predicts for male patients with elevated
+        # glucose. A hard glucose threshold ensures diabetic-range
+        # readings always produce an alert, regardless of the model score.
+        glucose = getattr(vital, "blood_glucose_mg_dl", None)
+        if glucose is not None:
+            title = "Diabetic Range Glucose Detected"
+            if glucose >= DIABETES_GLUCOSE_CRITICAL:
+                self._raise_alert(
+                    patient=patient,
+                    severity=AlertSeverity.CRITICAL,
+                    title=title,
+                    message=(
+                        f"Blood glucose {glucose} mg/dL is in the severe hyperglycemic "
+                        f"range (>= {DIABETES_GLUCOSE_CRITICAL})."
+                    ),
+                    related_vital_id=vital.id,
+                )
+            elif glucose >= DIABETES_GLUCOSE_WARNING:
+                self._raise_alert(
+                    patient=patient,
+                    severity=AlertSeverity.WARNING,
+                    title=title,
+                    message=(
+                        f"Blood glucose {glucose} mg/dL is in the diabetic range "
+                        f"(>= {DIABETES_GLUCOSE_WARNING})."
+                    ),
+                    related_vital_id=vital.id,
+                )
+
         return predictions, skipped
+
+    def _previous_prediction_was_elevated(
+        self, patient_id: uuid.UUID, disease: DiseaseType, exclude_id: uuid.UUID
+    ) -> bool:
+        """True if the most recent prediction for this disease BEFORE the
+        current one was also high/critical — i.e. the elevation is a
+        sustained pattern across consecutive readings, not a single flag.
+        This is the confidence gate that prevents low-precision models
+        from firing critical/emergency alerts on a one-off reading."""
+        previous = self.prediction_service.list_for_patient(patient_id, disease=disease)
+        for pred in previous:
+            if pred.id == exclude_id:
+                continue
+            return pred.risk_level in AI_ALERT_RISK_LEVELS
+        return False
 
     def _raise_alert(
         self,

@@ -7,9 +7,35 @@ export type DiseaseType = "stroke" | "diabetes" | "hypertension";
  * fields the condition-based vitals entry form REQUIRES/shows for a
  * risk prediction to run, not just which fields are emphasized. */
 export const CONDITION_ML_VITAL_FIELDS: Record<DiseaseType, string[]> = {
-  diabetes: ["blood_glucose_mg_dl", "blood_pressure_diastolic"],
-  hypertension: ["blood_pressure_systolic", "blood_pressure_diastolic", "heart_rate_bpm", "blood_glucose_mg_dl"],
-  stroke: ["blood_glucose_mg_dl", "blood_pressure_systolic", "heart_rate_bpm"],
+  // Every condition requires the complete core vitals (BP, heart rate,
+  // glucose, BMI, age) plus any condition-specific extra measurement —
+  // all three disease models take BMI + age, and the vitals form shows the
+  // full set for every condition selected.
+  diabetes: [
+    "blood_pressure_systolic",
+    "blood_pressure_diastolic",
+    "heart_rate_bpm",
+    "blood_glucose_mg_dl",
+    "bmi",
+    "age_years",
+    "diabetes_pedigree_function",
+  ],
+  hypertension: [
+    "blood_pressure_systolic",
+    "blood_pressure_diastolic",
+    "heart_rate_bpm",
+    "blood_glucose_mg_dl",
+    "bmi",
+    "age_years",
+  ],
+  stroke: [
+    "blood_pressure_systolic",
+    "blood_pressure_diastolic",
+    "heart_rate_bpm",
+    "blood_glucose_mg_dl",
+    "bmi",
+    "age_years",
+  ],
 };
 
 /** Which vitals fields matter for each condition — per the RPM workflow

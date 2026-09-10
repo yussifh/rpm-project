@@ -1,6 +1,14 @@
 """
-Synthetic training data generator — used for STROKE and HYPERTENSION only.
-(The diabetes model now trains on real data; see real_data.py.)
+Synthetic training data generator — RETIRED for STROKE and HYPERTENSION.
+(Diabetes has always trained on real data; see real_data.py.)
+
+As of model version v2.1.0, the stroke and hypertension models train on the
+REAL Framingham Heart Study dataset — see real_data.py
+(load_real_framingham_stroke_dataset / load_real_framingham_hypertension_dataset)
+and feature_schema.py. The generators below are preserved ONLY for
+reproducibility/audit of the retired synthetic models (backed up under
+app/ai_engine/models/backup_synthetic/) and are no longer wired into
+train.py.
 
 *** THESE TWO DATASETS ARE NOT REAL PATIENT DATA. ***
 

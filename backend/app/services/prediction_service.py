@@ -83,12 +83,22 @@ class PredictionService:
                 "entry is required before a risk prediction can be generated."
             )
 
-        bmi = _calculate_bmi(patient.height_cm, patient.weight_kg)
+        # BMI/Age come from the patient profile by default, but a reading
+        # can supply them manually (manual BMI/Age/height inputs on the
+        # vitals form) — manual values take priority. Weight from the
+        # reading (if any) takes priority over the profile weight too.
+        bmi = latest_vital.bmi or _calculate_bmi(
+            latest_vital.height_cm or patient.height_cm,
+            latest_vital.weight_kg or patient.weight_kg,
+        )
         if bmi is None:
             raise InsufficientDataError(
                 "Patient height and weight must both be recorded before a risk "
-                "prediction can be generated (required to compute BMI)."
+                "prediction can be generated (required to compute BMI). Alternatively, "
+                "a BMI value can be entered directly on the vitals reading."
             )
+
+        age = latest_vital.age_years or _calculate_age(patient.date_of_birth)
 
         history_entries = self.history.list_by_patient(patient.id)
         condition_names = " ".join(e.condition_name.lower() for e in history_entries)
@@ -96,7 +106,7 @@ class PredictionService:
         heart_disease_flag = int(any(kw in condition_names for kw in HEART_DISEASE_HISTORY_KEYWORDS))
 
         all_features = {
-            "age": _calculate_age(patient.date_of_birth),
+            "age": age,
             "gender_male": int(patient.gender == Gender.MALE),
             "hypertension_flag": hypertension_flag,
             "heart_disease_flag": heart_disease_flag,
@@ -106,6 +116,7 @@ class PredictionService:
             "systolic_bp": latest_vital.blood_pressure_systolic,
             "diastolic_bp": latest_vital.blood_pressure_diastolic,
             "heart_rate": latest_vital.heart_rate_bpm,
+            "diabetes_pedigree": latest_vital.diabetes_pedigree_function,
         }
 
         required = risk_engine.expected_features(DISEASE_TYPE_TO_KEY[disease])
@@ -126,6 +137,17 @@ class PredictionService:
 
         features, source_vital_id = self.build_features(patient, disease)
 
+        # Deduplication: if a prediction for this patient + disease already
+        # exists for this exact vital reading, return it instead of creating
+        # a duplicate. This prevents multiple identical predictions when
+        # record_reading is called repeatedly or the prediction pipeline
+        # is triggered more than once per submission.
+        existing = self.predictions.find_by_patient_disease_vital(
+            patient.id, disease, source_vital_id
+        )
+        if existing is not None:
+            return existing
+
         try:
             result = risk_engine.predict(DISEASE_TYPE_TO_KEY[disease], features)
         except ModelNotTrainedError as exc:
@@ -137,6 +159,24 @@ class PredictionService:
         recent_vitals = self.vitals.list_for_patient(patient.id, limit=5)
         risk_level = RISK_LEVEL_FROM_STRING[result["risk_level"]]
         missed_count = self._count_recent_missed_doses(patient)
+
+        # Clinical adequacy override for diabetes.
+        #
+        # The diabetes model was trained on the Pima Indians Diabetes dataset,
+        # which is overwhelmingly female and has a very high baseline diabetes
+        # prevalence. As a result it systematically UNDER-predicts diabetes for
+        # male patients (or anyone outside that population) even with clearly
+        # elevated glucose. Rather than retrain (out of scope), we apply a
+        # conservative, reproduciable clinical override: when a patient shows a
+        # SUSTAINED pattern of high glucose (>=2 of the last 3 readings >= 180
+        # mg/dL), the model score is corrected upward to reflect that this is
+        # not a one-off reading. This mirrors the "confirmation over time"
+        # design already used for hypertension/stroke alert escalation.
+        corrected_score = result["risk_score"]
+        if disease == DiseaseType.DIABETES:
+            risk_level, corrected_score = self._apply_diabetes_override(
+                risk_level, result["risk_score"], recent_vitals
+            )
 
         reasons = self._build_reasons(patient, disease, features, recent_vitals, missed_count)
         recommendations = generate_recommendations(
@@ -152,7 +192,7 @@ class PredictionService:
             patient_id=patient.id,
             source_vital_id=source_vital_id,
             disease_type=disease,
-            risk_score=result["risk_score"],
+            risk_score=corrected_score,
             risk_level=risk_level,
             model_version=result["model_version"],
             data_source=result["data_source"],
@@ -162,6 +202,34 @@ class PredictionService:
             predicted_at=datetime.now(timezone.utc),
         )
         return self.predictions.create(prediction)
+
+    def _apply_diabetes_override(
+        self,
+        risk_level: RiskLevel,
+        model_score: float,
+        recent_vitals: list,
+    ) -> tuple[RiskLevel, float]:
+        """Corrects the diabetes model's systematic under-prediction using
+        a sustained high-glucose pattern.
+
+        Pima-derived model tuning heavily discounts elevated glucose for
+        non-Pima (especially male) patients, so a single high reading is
+        NOT enough to override — we need >=2 of the last 3 readings >= 180
+        mg/dL (sustained, not a one-off). Precedence:
+          - If already HIGH/CRITICAL: leave the (more conservative) model
+            level alone.
+          - Sustained high glucose + model says MODERATE or below -> bump
+            to HIGH.
+        Returns (risk_level, corrected_score)."""
+        if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            return risk_level, model_score
+
+        high_glucose = [
+            v.blood_glucose_mg_dl for v in recent_vitals if v.blood_glucose_mg_dl
+        ][:3]
+        if len(high_glucose) >= 2 and sum(1 for g in high_glucose if g >= 180) >= 2:
+            return RiskLevel.HIGH, max(model_score, 0.7)
+        return risk_level, model_score
 
     def _count_recent_missed_doses(self, patient: PatientProfile) -> int:
         """Missed medication doses in the last 7 days across this

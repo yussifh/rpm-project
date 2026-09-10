@@ -42,8 +42,8 @@ class RiskPrediction(Base, TimestampMixin):
     risk_level: Mapped[RiskLevel] = mapped_column(str_enum_column(RiskLevel, "risk_level"), nullable=False)
 
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
-    # e.g. "real-pima-indians-diabetes-n768" or
-    # "synthetic-epidemiologically-informed" — surfaced in the UI so a
+    # e.g. "real-framingham-heart-study-n4240-clean~3800" or
+    # "real-pima-n724+bootstrap-augmented-n2172" — surfaced in the UI so a
     # clinician looking at a score knows how much weight it can bear.
     # Not just an internal note: this is what stands between "AI decision
     # support" and an unlabeled black-box number.

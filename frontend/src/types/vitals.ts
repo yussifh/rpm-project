@@ -11,6 +11,12 @@ export interface VitalReading {
   blood_pressure_diastolic: number | null;
   heart_rate_bpm: number | null;
   blood_glucose_mg_dl: number | null;
+  skin_thickness_mm: number | null;
+  serum_insulin_mu_u_ml: number | null;
+  diabetes_pedigree_function: number | null;
+  height_cm: number | null;
+  bmi: number | null;
+  age_years: number | null;
   spo2_percent: number | null;
   temperature_celsius: number | null;
   respiratory_rate: number | null;
@@ -31,6 +37,12 @@ export interface VitalReadingCreatePayload {
   blood_pressure_diastolic?: number;
   heart_rate_bpm?: number;
   blood_glucose_mg_dl?: number;
+  skin_thickness_mm?: number;
+  serum_insulin_mu_u_ml?: number;
+  diabetes_pedigree_function?: number;
+  height_cm?: number;
+  bmi?: number;
+  age_years?: number;
   spo2_percent?: number;
   temperature_celsius?: number;
   respiratory_rate?: number;

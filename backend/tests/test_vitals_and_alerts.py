@@ -133,6 +133,9 @@ def test_high_risk_vitals_trigger_ai_alert(client, admin_token, patient_token):
             "blood_pressure_diastolic": 104,
             "heart_rate_bpm": 95,
             "blood_glucose_mg_dl": 175,
+            "skin_thickness_mm": 22,
+            "serum_insulin_mu_u_ml": 95,
+            "diabetes_pedigree_function": 0.5,
         },
         headers=auth_headers(patient_token),
     )
@@ -197,6 +200,9 @@ def test_vitals_multiple_conditions_produce_separate_predictions(client, admin_t
             "blood_pressure_diastolic": 92,
             "heart_rate_bpm": 80,
             "blood_glucose_mg_dl": 160,
+            "skin_thickness_mm": 22,
+            "serum_insulin_mu_u_ml": 95,
+            "diabetes_pedigree_function": 0.5,
         },
         headers=auth_headers(patient_token),
     )

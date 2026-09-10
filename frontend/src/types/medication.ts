@@ -3,7 +3,6 @@ export type MedicationLogStatus = "taken" | "missed" | "skipped";
 export interface Medication {
   id: string;
   patient_id: string;
-  prescribed_by_id: string | null;
   name: string;
   dosage: string;
   frequency: string;

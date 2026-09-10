@@ -33,7 +33,16 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- CORS ---
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    # 5173 = Vite dev server; 4173 = `vite preview`, used to serve the
+    # built PWA the user installs (installable apps must be served over a
+    # secure context — localhost qualifies — and the production build is
+    # what registers the service worker, not the dev server).
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
 
     # --- AI Health Assistant (LLM backend) ---
     # Unset in an environment with no network egress (e.g. this dev

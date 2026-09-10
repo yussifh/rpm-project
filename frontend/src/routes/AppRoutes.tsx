@@ -5,6 +5,7 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 import { AdminDashboard } from "@/pages/dashboard/AdminDashboard";
 import { PatientDashboard } from "@/pages/dashboard/PatientDashboard";
 import { PatientsPage } from "@/pages/admin/PatientsPage";
+import { PatientRecordsPage } from "@/pages/admin/PatientRecordsPage";
 import { AuditLogPage } from "@/pages/admin/AuditLogPage";
 import { ModelsPage } from "@/pages/admin/ModelsPage";
 import { AlertsPage as AdminAlertsPage } from "@/pages/admin/AlertsPage";
@@ -14,6 +15,7 @@ import { AssessmentPage } from "@/pages/patient/AssessmentPage";
 import { AssistantPage } from "@/pages/patient/AssistantPage";
 import { NotificationsPage } from "@/pages/shared/NotificationsPage";
 import { SettingsPage } from "@/pages/shared/SettingsPage";
+import { ProgressPage } from "@/pages/patient/ProgressPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
@@ -37,6 +39,7 @@ export function AppRoutes() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="patients" element={<PatientsPage />} />
+        <Route path="patients/:patientId" element={<PatientRecordsPage />} />
         <Route path="models" element={<ModelsPage />} />
         <Route path="alerts" element={<AdminAlertsPage />} />
         <Route path="audit" element={<AuditLogPage />} />
@@ -55,6 +58,7 @@ export function AppRoutes() {
       >
         <Route index element={<PatientDashboard />} />
         <Route path="vitals" element={<VitalsPage />} />
+        <Route path="progress" element={<ProgressPage />} />
         <Route path="assessment" element={<AssessmentPage />} />
         <Route path="medications" element={<MedicationsPage />} />
         <Route path="assistant" element={<AssistantPage />} />

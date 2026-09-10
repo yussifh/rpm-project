@@ -40,6 +40,9 @@ def _seed_vitals(db_session, patient_id, **overrides):
         blood_pressure_diastolic=95,
         heart_rate_bpm=88,
         blood_glucose_mg_dl=170,
+        skin_thickness_mm=22,
+        serum_insulin_mu_u_ml=95,
+        diabetes_pedigree_function=0.5,
         spo2_percent=97,
     )
     defaults.update(overrides)

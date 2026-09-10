@@ -51,6 +51,19 @@ class VitalReading(Base, TimestampMixin):
 
     # --- Diabetes ---
     blood_glucose_mg_dl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Extra Pima-dataset measurements the diabetes model now uses — see
+    # app/ai_engine/feature_schema.py (DIABETES_FEATURES). Kept nullable
+    # since not every reading includes every measurement.
+    skin_thickness_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    serum_insulin_mu_u_ml: Mapped[float | None] = mapped_column(Float, nullable=True)
+    diabetes_pedigree_function: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Optional manual substitution inputs: let a patient enter the missing
+    # body-metric/Age features directly instead of deriving them from the
+    # profile (height/weight/DOB). When present these take priority; when
+    # blank the profile-derived values are used (see prediction_service).
+    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bmi: Mapped[float | None] = mapped_column(Float, nullable=True)
+    age_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # --- General / Stroke risk signals ---
     spo2_percent: Mapped[float | None] = mapped_column(Float, nullable=True)

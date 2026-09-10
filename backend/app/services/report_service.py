@@ -5,6 +5,8 @@ predictions into the plain dict shape app.reporting.pdf_builder expects,
 then calls it to produce PDF bytes.
 """
 
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 
@@ -91,6 +93,100 @@ class ReportService:
         }
 
         return build_patient_summary_pdf(report_data)
+
+    CSV_COLUMNS = [
+        "Date & Time",
+        "Systolic BP (mmHg)",
+        "Diastolic BP (mmHg)",
+        "Heart Rate (bpm)",
+        "Blood Glucose (mg/dL)",
+        "Diabetes Pedigree Function",
+        "SpO2 (%)",
+        "Temperature (°C)",
+        "Respiratory Rate (bpm)",
+        "Weight (kg)",
+        "Height (cm)",
+        "BMI",
+        "Age (years)",
+        "Notes",
+        "Diabetes Risk",
+        "Hypertension Risk",
+        "Stroke Risk",
+    ]
+
+    def generate_vitals_history_csv(self, patient_id: uuid.UUID) -> bytes:
+        """Exports the patient's ENTIRE vitals history as a spreadsheet
+        (.csv) file they can keep and open in Excel/share with a clinician.
+        Unlike the PDF summary (which is capped at the 10 latest readings),
+        this includes every reading ever logged, in chronological order.
+        A UTF-8 BOM is prepended so Excel renders the units column headers
+        (e.g. °C) correctly."""
+        patient = self.patients.get_by_id(patient_id)
+        if not patient:
+            raise NotFoundError("PatientProfile", str(patient_id))
+
+        # Page through the whole history — a patient with years of
+        # self-reported readings may exceed the repository's page size.
+        all_readings: list = []
+        offset = 0
+        while True:
+            page = self.vitals.list_for_patient(patient_id, skip=offset, limit=500)
+            if not page:
+                break
+            all_readings.extend(page)
+            offset += len(page)
+            if len(page) < 500:
+                break
+
+        # Chronological order makes the file read like a proper timeline.
+        all_readings.sort(key=lambda v: v.recorded_at)
+
+        # Map each reading to the AI risk predictions generated from it so
+        # the exported file mirrors the History table's Risk column (one
+        # level per tracked condition). A reading that was never assessed
+        # simply gets empty risk cells.
+        all_predictions = self.predictions.list_for_patient(patient_id)
+        risk_by_vital: dict[uuid.UUID, dict[str, tuple[str, float]]] = {}
+        for p in all_predictions:
+            if p.source_vital_id is None:
+                continue
+            risk_by_vital.setdefault(p.source_vital_id, {})[p.disease_type.value] = (
+                p.risk_level.value,
+                p.risk_score,
+            )
+
+        def risk_cell(entry: tuple[str, float] | None) -> str:
+            return f"{entry[0]} ({entry[1]:.3f})" if entry else ""
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(self.CSV_COLUMNS)
+        for v in all_readings:
+            risks = risk_by_vital.get(v.id, {})
+            writer.writerow(
+                [
+                    v.recorded_at.strftime("%Y-%m-%d %H:%M"),
+                    v.blood_pressure_systolic if v.blood_pressure_systolic is not None else "",
+                    v.blood_pressure_diastolic if v.blood_pressure_diastolic is not None else "",
+                    v.heart_rate_bpm if v.heart_rate_bpm is not None else "",
+                    v.blood_glucose_mg_dl if v.blood_glucose_mg_dl is not None else "",
+                    v.diabetes_pedigree_function if v.diabetes_pedigree_function is not None else "",
+                    v.spo2_percent if v.spo2_percent is not None else "",
+                    v.temperature_celsius if v.temperature_celsius is not None else "",
+                    v.respiratory_rate if v.respiratory_rate is not None else "",
+                    v.weight_kg if v.weight_kg is not None else "",
+                    v.height_cm if v.height_cm is not None else "",
+                    v.bmi if v.bmi is not None else "",
+                    v.age_years if v.age_years is not None else "",
+                    (v.notes or "").replace("\n", " "),
+                    risk_cell(risks.get("diabetes")),
+                    risk_cell(risks.get("hypertension")),
+                    risk_cell(risks.get("stroke")),
+                ]
+            )
+
+        # utf-8-sig = UTF-8 with BOM, so Excel detects the encoding.
+        return buffer.getvalue().encode("utf-8-sig")
 
     def _latest_prediction_per_disease(self, patient_id: uuid.UUID):
         all_predictions = self.predictions.list_for_patient(patient_id)  # already newest-first

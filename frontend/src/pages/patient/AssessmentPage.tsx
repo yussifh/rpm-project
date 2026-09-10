@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { RiskHeadline } from "@/components/ui/RiskHeadline";
 import { ConditionFilterTabs, type ConditionFilter } from "@/components/ui/ConditionFilterTabs";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { patientApi } from "@/services/patientApi";
@@ -12,7 +13,7 @@ import type { VitalTrend } from "@/types/vitals";
 
 const DISEASE_LABELS: Record<DiseaseType, string> = {
   diabetes: "Diabetes",
-  hypertension: "Hypertension",
+  hypertension: "High blood pressure",
   stroke: "Stroke",
 };
 
@@ -89,14 +90,11 @@ function AssessmentCard({ diseaseType, prediction, trends, onRefresh, isRefreshi
     <Card>
       <div className="flex items-center justify-between">
         <h2 className="font-display text-sm font-bold text-ink">{DISEASE_LABELS[diseaseType]}</h2>
-        <Badge tone={RISK_TONE[prediction.risk_level]}>{prediction.risk_level} risk</Badge>
+        <Badge tone={RISK_TONE[prediction.risk_level]}>{prediction.risk_level} concern</Badge>
       </div>
 
       <p className="mt-3 text-sm text-ink">
-        The ML model estimates a <span className="font-medium">{prediction.risk_level}</span> risk associated
-        with {DISEASE_LABELS[diseaseType].toLowerCase()}
-        {" "}
-        <span className="readout text-ink-soft">(score {(prediction.risk_score * 100).toFixed(0)}%)</span>.
+        <RiskHeadline prediction={prediction} />
       </p>
 
       {prediction.reasons.length > 0 && (
@@ -207,7 +205,7 @@ export function AssessmentPage() {
         <div>
           <h1 className="font-display text-xl font-bold text-ink">AI Health Assessment</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Risk estimates from the trained ML models, explained in plain language. Not a diagnosis.
+            How your recent readings look, explained in plain language. This isn't a diagnosis.
           </p>
         </div>
         <ConditionFilterTabs value={filter} onChange={setFilter} />

@@ -11,6 +11,8 @@ import { vitalsApi } from "@/services/vitalsApi";
 import { predictionApi } from "@/services/predictionApi";
 import { alertApi } from "@/services/alertApi";
 import { statusForRange, statusForSpo2 } from "@/utils/vitalsStatus";
+import { DISEASE_PLAIN_NAME } from "@/utils/plainLanguage";
+import { RiskHeadline } from "@/components/ui/RiskHeadline";
 import type { RiskLevel, RiskPrediction } from "@/types/prediction";
 
 const RISK_TONE: Record<RiskLevel, "stable" | "warning" | "critical" | "info"> = {
@@ -63,11 +65,18 @@ export function PatientDashboard() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Current Risk Status</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Current Health Status</p>
           {highestRisk ? (
-            <div className="mt-2 flex items-center gap-2">
-              <Badge tone={RISK_TONE[highestRisk.risk_level]}>{highestRisk.risk_level} risk</Badge>
-              <span className="text-sm capitalize text-ink-soft">{highestRisk.disease_type}</span>
+            <div className="mt-2">
+              <div className="flex items-center gap-2">
+                <Badge tone={RISK_TONE[highestRisk.risk_level]}>{highestRisk.risk_level} concern</Badge>
+                <span className="text-sm capitalize text-ink-soft">
+                  {DISEASE_PLAIN_NAME[highestRisk.disease_type]}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-ink">
+                <RiskHeadline prediction={highestRisk} />
+              </p>
             </div>
           ) : (
             <p className="mt-2 text-sm text-ink-soft">No AI assessment yet.</p>

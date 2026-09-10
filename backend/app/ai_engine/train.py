@@ -38,7 +38,11 @@ from app.ai_engine.data_synthesis import (
     generate_hypertension_dataset,
     generate_stroke_dataset,
 )
-from app.ai_engine.real_data import load_real_diabetes_dataset_augmented
+from app.ai_engine.real_data import (
+    load_real_diabetes_dataset_augmented,
+    load_real_framingham_hypertension_dataset,
+    load_real_framingham_stroke_dataset,
+)
 from app.ai_engine.feature_schema import (
     DIABETES,
     DIABETES_FEATURES,
@@ -70,22 +74,22 @@ CANDIDATE_MODELS = {
 
 DISEASE_CONFIG = {
     STROKE: {
-        "generator": generate_stroke_dataset,
+        "generator": load_real_framingham_stroke_dataset,
         "features": STROKE_FEATURES,
         "filename": "stroke_model.joblib",
-        "data_source": "synthetic-epidemiologically-informed-n30000",
+        "data_source": "real-framingham-heart-study-n4240-clean~3800",
     },
     DIABETES: {
         "generator": load_real_diabetes_dataset_augmented,
         "features": DIABETES_FEATURES,
         "filename": "diabetes_model.joblib",
-        "data_source": "real-pima-n724+bootstrap-augmented-n2172",
+        "data_source": "real-pima-n724+bootstrap-augmented-n2896",
     },
     HYPERTENSION: {
-        "generator": generate_hypertension_dataset,
+        "generator": load_real_framingham_hypertension_dataset,
         "features": HYPERTENSION_FEATURES,
         "filename": "hypertension_model.joblib",
-        "data_source": "synthetic-epidemiologically-informed-n30000",
+        "data_source": "real-framingham-heart-study-n4240-clean~3800",
     },
 }
 

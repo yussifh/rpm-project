@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { RiskHeadline } from "@/components/ui/RiskHeadline";
 import { VitalsTrendChart } from "@/components/charts/VitalsTrendChart";
 import { VitalTrendCard } from "@/components/charts/VitalTrendCard";
 import { useAsyncData } from "@/hooks/useAsyncData";
@@ -10,6 +11,7 @@ import { patientApi } from "@/services/patientApi";
 import { vitalsApi } from "@/services/vitalsApi";
 import { reportApi } from "@/services/reportApi";
 import { assessmentApi } from "@/services/assessmentApi";
+import { predictionApi } from "@/services/predictionApi";
 import { CONDITION_ML_VITAL_FIELDS, SYMPTOM_CHECKLISTS } from "@/types/diseaseAssessment";
 import type { VitalReadingCreatePayload, VitalSubmissionResult } from "@/types/vitals";
 import type { DiseaseType, RiskLevel } from "@/types/prediction";
@@ -20,9 +22,9 @@ const labelClass = "block text-xs font-medium uppercase tracking-wide text-ink-s
 const initialForm: VitalReadingCreatePayload = {};
 
 const CONDITION_OPTIONS: { value: DiseaseType; label: string; blurb: string }[] = [
-  { value: "diabetes", label: "Diabetes", blurb: "Blood glucose, blood pressure" },
-  { value: "hypertension", label: "Hypertension", blurb: "Blood pressure, heart rate, glucose" },
-  { value: "stroke", label: "Stroke", blurb: "Blood pressure, heart rate, glucose" },
+  { value: "diabetes", label: "Diabetes", blurb: "Complete vitals: BP, glucose, BMI, age + pedigree" },
+  { value: "hypertension", label: "Hypertension", blurb: "Complete vitals: BP, glucose, BMI, age" },
+  { value: "stroke", label: "Stroke", blurb: "Complete vitals: BP, glucose, BMI, age" },
 ];
 
 const FIELD_META: Record<
@@ -33,13 +35,14 @@ const FIELD_META: Record<
   blood_pressure_diastolic: { label: "Diastolic (mmHg)", unit: "mmHg", type: "int", min: 30, max: 200 },
   heart_rate_bpm: { label: "Heart rate (bpm)", unit: "bpm", type: "int", min: 20, max: 250 },
   blood_glucose_mg_dl: { label: "Glucose (mg/dL)", unit: "mg/dL", type: "float", min: 20, max: 800 },
-};
-
-const OTHER_FIELD_META: typeof FIELD_META = {
+  diabetes_pedigree_function: { label: "Diabetes pedigree", unit: "", type: "float", min: 0.02, max: 2.5, step: "0.01" },
+  height_cm: { label: "Height (cm)", unit: "cm", type: "float", min: 50, max: 250, step: "0.1" },
+  weight_kg: { label: "Weight (kg)", unit: "kg", type: "float", min: 2, max: 400, step: "0.1" },
+  bmi: { label: "BMI", unit: "kg/m²", type: "float", min: 10, max: 70, step: "0.1" },
+  age_years: { label: "Age (years)", unit: "yr", type: "int", min: 1, max: 120 },
   spo2_percent: { label: "SpO2 (%)", unit: "%", type: "float", min: 50, max: 100 },
   temperature_celsius: { label: "Temperature (°C)", unit: "°C", type: "float", min: 25, max: 45, step: "0.1" },
   respiratory_rate: { label: "Respiratory rate (breaths/min)", unit: "breaths/min", type: "int", min: 5, max: 60 },
-  weight_kg: { label: "Weight (kg)", unit: "kg", type: "float", min: 2, max: 400, step: "0.1" },
 };
 
 const RISK_TONE: Record<RiskLevel, "stable" | "warning" | "critical" | "info"> = {
@@ -70,6 +73,11 @@ export function VitalsPage() {
     refetch: refetchTrends,
   } = useAsyncData(() => (profile ? vitalsApi.trends(profile.id, 90) : Promise.resolve(null)), [profile?.id]);
 
+  const { data: predictions } = useAsyncData(
+    () => (profile ? predictionApi.list(profile.id) : Promise.resolve([])),
+    [profile?.id]
+  );
+
   // --- Condition-based vitals entry workflow state ---
   // step 1: pick condition(s) — `pickerOpen` true until the patient continues.
   // step 2: enter only the vitals those conditions need (+ optional extras).
@@ -78,7 +86,6 @@ export function VitalsPage() {
   const [pickerOpen, setPickerOpen] = useState(true);
   const [selectedConditions, setSelectedConditions] = useState<DiseaseType[]>([]);
   const [form, setForm] = useState<VitalReadingCreatePayload>(initialForm);
-  const [showOtherFields, setShowOtherFields] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -87,6 +94,7 @@ export function VitalsPage() {
   const [symptomsByCondition, setSymptomsByCondition] = useState<Partial<Record<DiseaseType, Record<string, boolean>>>>({});
   const [assessmentSubmitting, setAssessmentSubmitting] = useState(false);
   const [assessmentSaved, setAssessmentSaved] = useState(false);
+  const [showAssessmentConfirm, setShowAssessmentConfirm] = useState(false);
 
   function toggleSymptom(condition: DiseaseType, key: string, checked: boolean) {
     setSymptomsByCondition((prev) => ({
@@ -95,9 +103,14 @@ export function VitalsPage() {
     }));
   }
 
-  async function handleAssessmentSubmit(e: FormEvent) {
+  function handleAssessmentSubmit(e: FormEvent) {
     e.preventDefault();
-    if (selectedConditions.length === 0 || !profile) return;
+    if (selectedConditions.length === 0) return;
+    setShowAssessmentConfirm(true);
+  }
+
+  async function handleAssessmentConfirm() {
+    if (!profile) return;
     setAssessmentSubmitting(true);
     setAssessmentSaved(false);
     try {
@@ -113,6 +126,7 @@ export function VitalsPage() {
           })
         )
       );
+      setShowAssessmentConfirm(false);
       setSymptomsByCondition({});
       setAssessmentSaved(true);
     } finally {
@@ -132,14 +146,6 @@ export function VitalsPage() {
 
   function handleContinueFromPicker() {
     if (selectedConditions.length === 0) return;
-    const stillRequired = new Set(relevantFieldKeys(selectedConditions));
-    setForm((prev) => {
-      const next = { ...prev };
-      for (const key of Object.keys(FIELD_META)) {
-        if (!stillRequired.has(key)) delete (next as Record<string, unknown>)[key];
-      }
-      return next;
-    });
     setPickerOpen(false);
   }
 
@@ -173,7 +179,6 @@ export function VitalsPage() {
     setResult(null);
     setForm(initialForm);
     setSelectedConditions([]);
-    setShowOtherFields(false);
     setSymptomsByCondition({});
     setAssessmentSaved(false);
     setPickerOpen(true);
@@ -181,10 +186,9 @@ export function VitalsPage() {
 
   const requiredKeys = new Set(relevantFieldKeys(selectedConditions));
 
-  const enteredEntries = [
-    ...Object.entries(FIELD_META).filter(([key]) => requiredKeys.has(key)),
-    ...Object.entries(OTHER_FIELD_META),
-  ].filter(([key]) => (form as Record<string, unknown>)[key] !== undefined && (form as Record<string, unknown>)[key] !== "");
+  const enteredEntries = Object.entries(FIELD_META).filter(
+    ([key]) => (form as Record<string, unknown>)[key] !== undefined && (form as Record<string, unknown>)[key] !== ""
+  );
 
   const filteredTrends =
     selectedConditions.length > 0
@@ -200,13 +204,22 @@ export function VitalsPage() {
           <h1 className="font-display text-2xl font-bold text-ink">My Vitals</h1>
           <p className="mt-1 text-sm text-ink-soft">Log a new reading and review your history.</p>
         </div>
-        <button
-          onClick={() => profile && reportApi.downloadSummary(profile.id, user?.full_name)}
-          disabled={!profile}
-          className="rounded-lg border border-surface-border px-3 py-2 text-xs font-medium text-ink hover:bg-surface-sunken disabled:opacity-60"
-        >
-          Download AI health report
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => profile && reportApi.downloadVitalsHistory(profile.id, user?.full_name)}
+            disabled={!profile}
+            className="rounded-lg border border-surface-border px-3 py-2 text-xs font-medium text-ink hover:bg-surface-sunken disabled:opacity-60"
+          >
+            Download history (CSV)
+          </button>
+          <button
+            onClick={() => profile && reportApi.downloadSummary(profile.id, user?.full_name)}
+            disabled={!profile}
+            className="rounded-lg border border-surface-border px-3 py-2 text-xs font-medium text-ink hover:bg-surface-sunken disabled:opacity-60"
+          >
+            Download AI health report
+          </button>
+        </div>
       </div>
 
       {profileError && (
@@ -245,7 +258,11 @@ export function VitalsPage() {
                       <Badge tone={RISK_TONE[prediction.risk_level]}>{prediction.risk_level} risk</Badge>
                     </div>
                     <p className="mt-2 text-sm text-ink">
-                      Risk score <span className="readout font-medium">{(prediction.risk_score * 100).toFixed(0)}%</span>
+                      <RiskHeadline prediction={prediction} />
+                      <span className="text-ink-soft">
+                        {" "}
+                        (risk score {(prediction.risk_score * 100).toFixed(0)} / 100)
+                      </span>
                     </p>
                     {prediction.reasons.length > 0 && (
                       <ul className="mt-2 list-inside list-disc space-y-1">
@@ -296,7 +313,8 @@ export function VitalsPage() {
           <div>
             <h2 className="font-display text-sm font-bold text-ink">Select condition(s) to monitor</h2>
             <p className="mt-1 text-xs text-ink-soft">
-              Choose at least one. This decides which vitals you'll enter and which AI model(s) assess this reading.
+              Choose at least one. This decides which AI model(s) assess this reading — you can enter all
+              measurements manually regardless of what you pick.
             </p>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {CONDITION_OPTIONS.map((opt) => {
@@ -343,48 +361,31 @@ export function VitalsPage() {
             </div>
 
             <form onSubmit={handleAnalyzeClick} className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {Object.entries(FIELD_META)
-                .filter(([key]) => requiredKeys.has(key))
-                .map(([key, meta]) => (
-                  <div key={key}>
-                    <label className={labelClass}>{meta.label}</label>
-                    <input
-                      type="number"
-                      step={meta.step}
-                      min={meta.min}
-                      max={meta.max}
-                      value={((form as Record<string, unknown>)[key] as number | undefined) ?? ""}
-                      onChange={(e) => update(key as keyof VitalReadingCreatePayload, (e.target.value ? Number(e.target.value) : undefined) as never)}
-                      className={inputClass}
-                    />
-                  </div>
-                ))}
+              {Object.entries(FIELD_META).map(([key, meta]) => (
+                <div key={key}>
+                  <label className={labelClass}>
+                    {meta.label}
+                    {requiredKeys.has(key) && <span className="ml-1 font-bold text-status-critical">*</span>}
+                  </label>
+                  <input
+                    type="number"
+                    step={meta.step}
+                    min={meta.min}
+                    max={meta.max}
+                    value={((form as Record<string, unknown>)[key] as number | undefined) ?? ""}
+                    onChange={(e) => update(key as keyof VitalReadingCreatePayload, (e.target.value ? Number(e.target.value) : undefined) as never)}
+                    className={inputClass}
+                  />
+                </div>
+              ))}
 
               <div className="col-span-2 sm:col-span-4">
-                <button
-                  type="button"
-                  onClick={() => setShowOtherFields((v) => !v)}
-                  className="text-xs font-medium text-ink-soft hover:text-ink"
-                >
-                  {showOtherFields ? "Hide" : "Add"} other measurements (weight, SpO2, temperature…)
-                </button>
+                <p className="text-xs text-ink-soft">
+                  Fields marked <span className="font-bold text-status-critical">*</span> are the complete set of
+                  measurements your selected condition's assessment uses (BP, glucose, BMI, age and more). Enter the
+                  ones you have — the AI uses everything it can.
+                </p>
               </div>
-
-              {showOtherFields &&
-                Object.entries(OTHER_FIELD_META).map(([key, meta]) => (
-                  <div key={key}>
-                    <label className={labelClass}>{meta.label}</label>
-                    <input
-                      type="number"
-                      step={meta.step}
-                      min={meta.min}
-                      max={meta.max}
-                      value={((form as Record<string, unknown>)[key] as number | undefined) ?? ""}
-                      onChange={(e) => update(key as keyof VitalReadingCreatePayload, (e.target.value ? Number(e.target.value) : undefined) as never)}
-                      className={inputClass}
-                    />
-                  </div>
-                ))}
 
               <div className="col-span-2 sm:col-span-4">
                 <label className={labelClass}>Notes</label>
@@ -474,6 +475,57 @@ export function VitalsPage() {
         </Modal>
       )}
 
+      {showAssessmentConfirm && (
+        <Modal title="Review your symptom check" onClose={() => setShowAssessmentConfirm(false)}>
+          <p className="text-sm text-ink-soft">
+            Please review your symptom selections before this is added to your AI health assessment. If anything is
+            incorrect, select Edit before continuing.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            {selectedConditions.map((condition) => {
+              const checked = (SYMPTOM_CHECKLISTS[condition] ?? []).filter(({ key }) =>
+                symptomsByCondition[condition]?.[key]
+              );
+              return (
+                <div key={condition}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{condition}</p>
+                  {checked.length === 0 ? (
+                    <p className="mt-1 text-sm text-ink-soft">No symptoms selected.</p>
+                  ) : (
+                    <ul className="mt-1 list-inside list-disc space-y-1">
+                      {checked.map(({ key, label }) => (
+                        <li key={key} className="text-sm text-ink">
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAssessmentConfirm(false)}
+              className="rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-ink hover:bg-surface-sunken"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={handleAssessmentConfirm}
+              disabled={assessmentSubmitting}
+              className="rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-60"
+            >
+              {assessmentSubmitting ? "Saving…" : "Confirm"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {selectedConditions.length > 0 && (
         <Card className="mt-6">
           <h2 className="font-display text-sm font-bold text-ink">Today's symptom check</h2>
@@ -512,10 +564,23 @@ export function VitalsPage() {
       )}
 
       <Card className="mt-6">
-        <h2 className="font-display text-sm font-bold text-ink">Trend</h2>
-        {error && <p className="mt-4 text-sm text-status-critical">Couldn't load vitals history.</p>}
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-sm font-bold text-ink">Vitals Graph</h2>
+          <span className="text-xs text-ink-soft">
+            {readings?.length ?? 0} reading{(readings?.length ?? 0) === 1 ? "" : "s"} logged
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-ink-soft">
+          Every measurement you've entered over time — pick a measurement to graph it.
+        </p>
         <div className="mt-4">
-          {isLoading ? <p className="text-sm text-ink-soft">Loading…</p> : <VitalsTrendChart readings={readings ?? []} />}
+          {isLoading ? (
+            <p className="text-sm text-ink-soft">Loading…</p>
+          ) : error ? (
+            <p className="text-sm text-status-critical">Couldn't load vitals history.</p>
+          ) : (
+            <VitalsTrendChart readings={readings ?? []} />
+          )}
         </div>
       </Card>
 
@@ -561,9 +626,10 @@ export function VitalsPage() {
                   <th className="py-2 pr-4 font-medium">BP</th>
                   <th className="py-2 pr-4 font-medium">HR</th>
                   <th className="py-2 pr-4 font-medium">Glucose</th>
+                  <th className="py-2 pr-4 font-medium">BMI</th>
                   <th className="py-2 pr-4 font-medium">SpO2</th>
                   <th className="py-2 pr-4 font-medium">Weight</th>
-                  <th className="py-2 pr-4 font-medium">Source</th>
+                  <th className="py-2 pr-4 font-medium">Risk</th>
                 </tr>
               </thead>
               <tbody>
@@ -577,9 +643,24 @@ export function VitalsPage() {
                     </td>
                     <td className="py-2 pr-4 readout text-ink">{r.heart_rate_bpm ?? "—"}</td>
                     <td className="py-2 pr-4 readout text-ink">{r.blood_glucose_mg_dl ?? "—"}</td>
+                    <td className="py-2 pr-4 readout text-ink">{r.bmi ?? "—"}</td>
                     <td className="py-2 pr-4 readout text-ink">{r.spo2_percent ?? "—"}</td>
                     <td className="py-2 pr-4 readout text-ink">{r.weight_kg ? `${r.weight_kg} kg` : "—"}</td>
-                    <td className="py-2 pr-4 capitalize text-ink-soft">{r.source}</td>
+                    <td className="py-2 pr-4">
+                      {predictions?.some((p) => p.source_vital_id === r.id) ? (
+                        <span className="flex flex-wrap gap-1">
+                          {predictions
+                            .filter((p) => p.source_vital_id === r.id)
+                            .map((p) => (
+                              <Badge key={p.id} tone={RISK_TONE[p.risk_level]}>
+                                {p.disease_type}: {p.risk_level}
+                              </Badge>
+                            ))}
+                        </span>
+                      ) : (
+                        <span className="text-ink-soft">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

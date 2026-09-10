@@ -1,4 +1,5 @@
 import { Fragment, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useAsyncData } from "@/hooks/useAsyncData";
@@ -50,6 +51,7 @@ function toEditForm(patient: PatientProfile): EditForm {
 }
 
 export function PatientsPage() {
+  const navigate = useNavigate();
   const { data: patients, isLoading, error, refetch } = useAsyncData(() => patientApi.list(), []);
   const { data: users, refetch: refetchUsers } = useAsyncData(() => adminApi.listUsers("patient"), []);
 
@@ -256,6 +258,12 @@ export function PatientsPage() {
                           <Badge tone={isActive ? "stable" : "neutral"}>{isActive ? "Active" : "Inactive"}</Badge>
                         </td>
                         <td className="py-3 pr-4 whitespace-nowrap">
+                          <button
+                            onClick={() => navigate(`/admin/patients/${patient.id}`)}
+                            className="mr-3 text-sm font-medium text-teal-600 hover:underline"
+                          >
+                            View Records
+                          </button>
                           <button
                             onClick={() => (isEditing ? setEditingId(null) : startEdit(patient))}
                             className="mr-3 text-sm font-medium text-teal-600 hover:underline"

@@ -21,6 +21,21 @@ class PredictionRepository:
         stmt = stmt.order_by(RiskPrediction.predicted_at.desc())
         return list(self.db.execute(stmt).scalars().all())
 
+    def find_by_patient_disease_vital(
+        self, patient_id: uuid.UUID, disease_type, source_vital_id: uuid.UUID
+    ) -> RiskPrediction | None:
+        stmt = (
+            select(RiskPrediction)
+            .where(
+                RiskPrediction.patient_id == patient_id,
+                RiskPrediction.disease_type == disease_type,
+                RiskPrediction.source_vital_id == source_vital_id,
+            )
+            .order_by(RiskPrediction.predicted_at.desc())
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalars().first()
+
     def create(self, prediction: RiskPrediction) -> RiskPrediction:
         self.db.add(prediction)
         self.db.commit()

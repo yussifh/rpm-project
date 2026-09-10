@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   Pill,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth";
@@ -30,6 +31,7 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
   patient: [
     { label: "Dashboard", path: "/patient", icon: LayoutDashboard },
     { label: "My Vitals", path: "/patient/vitals", icon: Activity },
+    { label: "My Progress", path: "/patient/progress", icon: TrendingUp },
     { label: "AI Assessment", path: "/patient/assessment", icon: BrainCircuit },
     { label: "Medications", path: "/patient/medications", icon: Pill },
     { label: "AI Assistant", path: "/patient/assistant", icon: MessageCircle },

@@ -27,6 +27,12 @@ class VitalReadingCreate(BaseModel):
     blood_pressure_diastolic: int | None = Field(default=None, ge=30, le=200)
     heart_rate_bpm: int | None = Field(default=None, ge=20, le=250)
     blood_glucose_mg_dl: float | None = Field(default=None, ge=20, le=800)
+    skin_thickness_mm: float | None = Field(default=None, ge=1, le=100)
+    serum_insulin_mu_u_ml: float | None = Field(default=None, ge=1, le=900)
+    diabetes_pedigree_function: float | None = Field(default=None, ge=0.02, le=2.5)
+    height_cm: float | None = Field(default=None, ge=50, le=250)
+    bmi: float | None = Field(default=None, ge=10, le=70)
+    age_years: int | None = Field(default=None, ge=1, le=120)
     spo2_percent: float | None = Field(default=None, ge=50, le=100)
     temperature_celsius: float | None = Field(default=None, ge=25, le=45)
     respiratory_rate: int | None = Field(default=None, ge=5, le=60)
@@ -40,6 +46,12 @@ class VitalReadingCreate(BaseModel):
             self.blood_pressure_diastolic,
             self.heart_rate_bpm,
             self.blood_glucose_mg_dl,
+            self.skin_thickness_mm,
+            self.serum_insulin_mu_u_ml,
+            self.diabetes_pedigree_function,
+            self.height_cm,
+            self.bmi,
+            self.age_years,
             self.spo2_percent,
             self.temperature_celsius,
             self.respiratory_rate,
@@ -59,6 +71,12 @@ class VitalReadingOut(BaseModel):
     blood_pressure_diastolic: int | None
     heart_rate_bpm: int | None
     blood_glucose_mg_dl: float | None
+    skin_thickness_mm: float | None
+    serum_insulin_mu_u_ml: float | None
+    diabetes_pedigree_function: float | None
+    height_cm: float | None
+    bmi: float | None
+    age_years: int | None
     spo2_percent: float | None
     temperature_celsius: float | None
     respiratory_rate: int | None
