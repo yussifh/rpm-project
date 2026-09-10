@@ -19,13 +19,13 @@ services:
     plan: free
     databaseName: rpm_db
     user: rpm_user
-    ipAllowList: ""
+    ipAllowList: "*"
 
   # --- Managed Redis (Key Value) ---
   - type: redis
     name: rpm-redis
     plan: free
-    ipAllowList: ""
+    ipAllowList: "*"
 
   # --- Backend API (FastAPI + Docker) ---
   - type: web
@@ -57,6 +57,8 @@ services:
         value: '["https://rpm-frontend.onrender.com"]'
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: WEB_CONCURRENCY
+        value: "2"
 
   # --- Frontend PWA (static site) ---
   - type: web
