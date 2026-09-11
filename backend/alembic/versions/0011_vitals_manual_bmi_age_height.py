@@ -1,6 +1,6 @@
 """add manual BMI/age/height inputs to vital_readings
 
-Revision ID: 0011_vitals_manual_bmi_age_height
+Revision ID: 0011_vitals_manual_metrics
 Revises: 0010_vitals_diabetes_pima_fields
 Create Date: 2026-09-09
 
@@ -14,7 +14,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "0011_vitals_manual_bmi_age_height"
+revision: str = "0011_vitals_manual_metrics"
 down_revision: Union[str, None] = "0010_vitals_diabetes_pima_fields"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
