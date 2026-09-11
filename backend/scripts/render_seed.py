@@ -74,6 +74,10 @@ def _ensure_user(db, email, password, full_name, role):
         is_verified=True,
     )
     db.add(user)
+    # Flush each UUID-backed User individually. SQLAlchemy's Postgres
+    # insertmanyvalues path can otherwise fail to correlate UUID sentinel
+    # values when multiple new users are flushed in the same batch.
+    db.flush()
     return user
 
 
@@ -84,6 +88,7 @@ def main():
         admin = _ensure_user(db, "admin@rpm.com", "AdminPass123", "System Admin", UserRole.ADMIN)
         if not admin.admin_profile:
             db.add(AdminProfile(user=admin, department="IT", job_title="System Admin", is_super_admin=True))
+            db.flush()
 
         patient = _ensure_user(db, "hamza@rpm.com", "PatientPass123", "Yussif Hamza", UserRole.PATIENT)
         if not patient.patient_profile:
@@ -95,6 +100,7 @@ def main():
                 weight_kg=74.0,
                 primary_condition=DiseaseType.STROKE,
             ))
+            db.flush()
         db.commit()
         db.refresh(admin)
         db.refresh(patient)
