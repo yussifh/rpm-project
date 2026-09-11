@@ -24,6 +24,8 @@ services:
     name: rpm-backend
     runtime: docker
     rootDir: backend
+    dockerfilePath: ./Dockerfile.prod
+    dockerContext: .
     plan: free
     healthCheckPath: /health
     envVars:
