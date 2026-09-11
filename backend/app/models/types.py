@@ -24,33 +24,33 @@ Postgres schema. Always build enum columns via this helper, not `Enum(...)`
 directly.
 """
 
-from sqlalchemy import JSON, Enum, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy import JSON, Enum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import TypeDecorator, CHAR
 
 
 class PortableUUID(TypeDecorator):
-    """UUID column that stores as native UUID on Postgres and as a
-    VARCHAR(36) string on SQLite. Handles the binding/result conversion
-    between `uuid.UUID` and its string form so inserts work on both."""
+    """UUID value stored consistently as a 36-character string.
+
+    The project's Alembic schema defines UUID primary/foreign-key columns as
+    VARCHAR(36) on PostgreSQL. Keeping the ORM on the same representation
+    avoids uuid-vs-varchar comparison errors while still exposing uuid.UUID
+    objects to Python code.
+    """
 
     impl = CHAR
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(PG_UUID(as_uuid=True))
         return dialect.type_descriptor(CHAR(36))
 
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
-        if dialect.name == "postgresql":
-            return value
         return str(value)
 
     def process_result_value(self, value, dialect):
-        if value is None or dialect.name == "postgresql":
+        if value is None:
             return value
         if isinstance(value, str):
             import uuid
@@ -70,4 +70,3 @@ def str_enum_column(enum_cls, name: str):
     """Enum column that binds/reads using `.value`, matching both the
     Alembic-created Postgres enum type and the enum's own string values."""
     return Enum(enum_cls, name=name, values_callable=lambda obj: [e.value for e in obj])
-
